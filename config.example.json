@@ -1,0 +1,8 @@
+{
+  "client_id": "YOUR_OAUTH_CLIENT_ID",
+  "client_secret": "YOUR_OAUTH_CLIENT_SECRET",
+  "refresh_token": "YOUR_REFRESH_TOKEN",
+  "developer_token": "YOUR_DEVELOPER_TOKEN",
+  "login_customer_id": "YOUR_MANAGER_ACCOUNT_ID",
+  "use_proto_plus": true
+}
