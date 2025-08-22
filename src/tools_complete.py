@@ -12,6 +12,11 @@ from .auth import GoogleAdsAuthManager
 from .error_handler import ErrorHandler
 from .tools_campaigns import CampaignTools
 from .tools_reporting import ReportingTools
+from .tools_ad_groups import AdGroupTools
+from .tools_ads import AdTools
+from .tools_keywords import KeywordTools
+from .tools_budgets import BudgetTools
+from .tools_assets import AssetTools
 from .utils import currency_to_micros, micros_to_currency
 
 logger = structlog.get_logger(__name__)
@@ -27,6 +32,11 @@ class GoogleAdsTools:
         # Initialize tool modules
         self.campaign_tools = CampaignTools(auth_manager, error_handler)
         self.reporting_tools = ReportingTools(auth_manager, error_handler)
+        self.ad_group_tools = AdGroupTools(auth_manager, error_handler)
+        self.ad_tools = AdTools(auth_manager, error_handler)
+        self.keyword_tools = KeywordTools(auth_manager, error_handler)
+        self.budget_tools = BudgetTools(auth_manager, error_handler)
+        self.asset_tools = AssetTools(auth_manager, error_handler)
         
         self._tools_registry = self._register_all_tools()
         
@@ -158,7 +168,7 @@ class GoogleAdsTools:
         return {
             "create_ad_group": {
                 "description": "Create a new ad group in a campaign",
-                "handler": self.create_ad_group,
+                "handler": self.ad_group_tools.create_ad_group,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "campaign_id": {"type": "string", "required": True},
@@ -168,7 +178,7 @@ class GoogleAdsTools:
             },
             "update_ad_group": {
                 "description": "Update ad group settings",
-                "handler": self.update_ad_group,
+                "handler": self.ad_group_tools.update_ad_group,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string", "required": True},
@@ -179,7 +189,7 @@ class GoogleAdsTools:
             },
             "list_ad_groups": {
                 "description": "List ad groups with filters",
-                "handler": self.list_ad_groups,
+                "handler": self.ad_group_tools.list_ad_groups,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "campaign_id": {"type": "string"},
@@ -193,7 +203,7 @@ class GoogleAdsTools:
         return {
             "create_responsive_search_ad": {
                 "description": "Create a responsive search ad",
-                "handler": self.create_responsive_search_ad,
+                "handler": self.ad_tools.create_responsive_search_ad,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string", "required": True},
@@ -206,7 +216,7 @@ class GoogleAdsTools:
             },
             "create_expanded_text_ad": {
                 "description": "Create an expanded text ad",
-                "handler": self.create_expanded_text_ad,
+                "handler": self.ad_tools.create_expanded_text_ad,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string", "required": True},
@@ -220,7 +230,7 @@ class GoogleAdsTools:
             },
             "list_ads": {
                 "description": "List ads with filters",
-                "handler": self.list_ads,
+                "handler": self.ad_tools.list_ads,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string"},
@@ -235,7 +245,7 @@ class GoogleAdsTools:
         return {
             "upload_image_asset": {
                 "description": "Upload an image asset",
-                "handler": self.upload_image_asset,
+                "handler": self.asset_tools.upload_image_asset,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "image_data": {"type": "string", "required": True},
@@ -244,7 +254,7 @@ class GoogleAdsTools:
             },
             "upload_text_asset": {
                 "description": "Create a text asset",
-                "handler": self.upload_text_asset,
+                "handler": self.asset_tools.upload_text_asset,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "text": {"type": "string", "required": True},
@@ -253,7 +263,7 @@ class GoogleAdsTools:
             },
             "list_assets": {
                 "description": "List all assets",
-                "handler": self.list_assets,
+                "handler": self.asset_tools.list_assets,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "asset_type": {"type": "string"},
@@ -266,7 +276,7 @@ class GoogleAdsTools:
         return {
             "create_budget": {
                 "description": "Create a shared campaign budget",
-                "handler": self.create_budget,
+                "handler": self.budget_tools.create_budget,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "name": {"type": "string", "required": True},
@@ -276,7 +286,7 @@ class GoogleAdsTools:
             },
             "update_budget": {
                 "description": "Update budget amount or settings",
-                "handler": self.update_budget,
+                "handler": self.budget_tools.update_budget,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "budget_id": {"type": "string", "required": True},
@@ -286,7 +296,7 @@ class GoogleAdsTools:
             },
             "list_budgets": {
                 "description": "List all budgets",
-                "handler": self.list_budgets,
+                "handler": self.budget_tools.list_budgets,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                 },
@@ -298,7 +308,7 @@ class GoogleAdsTools:
         return {
             "add_keywords": {
                 "description": "Add keywords to an ad group",
-                "handler": self.add_keywords,
+                "handler": self.keyword_tools.add_keywords,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string", "required": True},
@@ -307,7 +317,7 @@ class GoogleAdsTools:
             },
             "add_negative_keywords": {
                 "description": "Add negative keywords (campaign or ad group level)",
-                "handler": self.add_negative_keywords,
+                "handler": self.keyword_tools.add_negative_keywords,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "keywords": {"type": "array", "required": True},
@@ -317,7 +327,7 @@ class GoogleAdsTools:
             },
             "list_keywords": {
                 "description": "List keywords with performance data",
-                "handler": self.list_keywords,
+                "handler": self.keyword_tools.list_keywords,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string"},
