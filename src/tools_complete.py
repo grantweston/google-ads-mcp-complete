@@ -17,6 +17,7 @@ from .tools_ads import AdTools
 from .tools_keywords import KeywordTools
 from .tools_budgets import BudgetTools
 from .tools_assets import AssetTools
+from .tools_extensions import ExtensionTools
 from .utils import currency_to_micros, micros_to_currency
 
 logger = structlog.get_logger(__name__)
@@ -37,6 +38,7 @@ class GoogleAdsTools:
         self.keyword_tools = KeywordTools(auth_manager, error_handler)
         self.budget_tools = BudgetTools(auth_manager, error_handler)
         self.asset_tools = AssetTools(auth_manager, error_handler)
+        self.extension_tools = ExtensionTools(auth_manager, error_handler)
         
         self._tools_registry = self._register_all_tools()
         
@@ -68,7 +70,10 @@ class GoogleAdsTools:
         
         # Keyword Management
         tools.update(self._register_keyword_tools())
-        # 
+        
+        # Extension Management
+        tools.update(self._register_extension_tools())
+        
         # # Advanced Features
         # tools.update(self._register_advanced_tools())
         
@@ -159,6 +164,24 @@ class GoogleAdsTools:
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "campaign_id": {"type": "string", "required": True},
+                },
+            },
+            "delete_campaign": {
+                "description": "Delete a campaign permanently",
+                "handler": self.campaign_tools.delete_campaign,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string", "required": True},
+                },
+            },
+            "copy_campaign": {
+                "description": "Copy an existing campaign with a new name and budget",
+                "handler": self.campaign_tools.copy_campaign,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "source_campaign_id": {"type": "string", "required": True},
+                    "new_name": {"type": "string", "required": True},
+                    "budget_amount": {"type": "number"},
                 },
             },
         }
@@ -372,6 +395,103 @@ class GoogleAdsTools:
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string"},
                     "campaign_id": {"type": "string"},
+                },
+            },
+            "update_keyword_bid": {
+                "description": "Update the CPC bid for a specific keyword",
+                "handler": self.keyword_tools.update_keyword_bid,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "keyword_id": {"type": "string", "required": True},
+                    "cpc_bid_micros": {"type": "number", "required": True},
+                },
+            },
+            "delete_keyword": {
+                "description": "Delete a specific keyword",
+                "handler": self.keyword_tools.delete_keyword,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "keyword_id": {"type": "string", "required": True},
+                },
+            },
+            "pause_keyword": {
+                "description": "Pause a specific keyword",
+                "handler": self.keyword_tools.pause_keyword,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "keyword_id": {"type": "string", "required": True},
+                },
+            },
+            "enable_keyword": {
+                "description": "Enable a paused keyword",
+                "handler": self.keyword_tools.enable_keyword,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "keyword_id": {"type": "string", "required": True},
+                },
+            },
+            "get_keyword_performance": {
+                "description": "Get keyword performance data with quality scores",
+                "handler": self.keyword_tools.get_keyword_performance,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string"},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                },
+            },
+        }
+        
+    def _register_extension_tools(self) -> Dict[str, Dict[str, Any]]:
+        """Register extension management tools."""
+        return {
+            "create_sitelink_extensions": {
+                "description": "Create sitelink extensions for a campaign",
+                "handler": self.extension_tools.create_sitelink_extensions,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string", "required": True},
+                    "sitelinks": {"type": "array", "required": True},
+                },
+            },
+            "create_callout_extensions": {
+                "description": "Create callout extensions for a campaign",
+                "handler": self.extension_tools.create_callout_extensions,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string", "required": True},
+                    "callouts": {"type": "array", "required": True},
+                },
+            },
+            "create_call_extensions": {
+                "description": "Create call extensions for a campaign",
+                "handler": self.extension_tools.create_call_extensions,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string", "required": True},
+                    "phone_number": {"type": "string", "required": True},
+                    "country_code": {"type": "string", "default": "US"},
+                    "call_only": {"type": "boolean", "default": False},
+                },
+            },
+            "list_extensions": {
+                "description": "List extensions for a campaign or account",
+                "handler": self.extension_tools.list_extensions,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string"},
+                    "extension_type": {"type": "string"},
+                },
+            },
+            "delete_extension": {
+                "description": "Delete a specific extension",
+                "handler": self.extension_tools.delete_extension,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "extension_id": {"type": "string", "required": True},
                 },
             },
         }

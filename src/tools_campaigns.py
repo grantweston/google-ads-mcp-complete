@@ -437,3 +437,106 @@ class CampaignTools:
         except Exception as e:
             logger.error(f"Unexpected error getting campaign: {e}")
             raise
+    
+    async def delete_campaign(self, customer_id: str, campaign_id: str) -> Dict[str, Any]:
+        """Delete a campaign permanently."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            campaign_service = client.get_service("CampaignService")
+            
+            # Create remove operation
+            campaign_operation = client.get_type("CampaignOperation")
+            campaign_operation.remove = client.get_service("CampaignService").campaign_path(
+                customer_id, campaign_id
+            )
+            
+            # Execute the removal
+            response = campaign_service.mutate_campaigns(
+                customer_id=customer_id,
+                operations=[campaign_operation]
+            )
+            
+            return {
+                "success": True,
+                "campaign_id": campaign_id,
+                "message": "Campaign deleted successfully",
+                "resource_name": response.results[0].resource_name,
+            }
+            
+        except GoogleAdsException as e:
+            logger.error(f"Failed to delete campaign: {e}")
+            return self.error_handler.format_error_response(e)
+        
+        except Exception as e:
+            logger.error(f"Unexpected error deleting campaign: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "error_type": "UnexpectedError"
+            }
+    
+    async def copy_campaign(
+        self,
+        customer_id: str,
+        source_campaign_id: str,
+        new_name: str,
+        budget_amount: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """Copy an existing campaign with a new name and optionally new budget."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            
+            # First, get the source campaign details
+            source_campaign_result = await self.get_campaign(customer_id, source_campaign_id)
+            if not source_campaign_result.get("success"):
+                return {
+                    "success": False,
+                    "error": "Source campaign not found or inaccessible",
+                    "source_campaign_id": source_campaign_id
+                }
+            
+            source_campaign = source_campaign_result["campaign"]
+            
+            # Create new campaign with similar settings
+            new_campaign_data = {
+                "customer_id": customer_id,
+                "name": new_name,
+                "budget_amount": budget_amount or 50.0,  # Default budget if not specified
+                "campaign_type": source_campaign.get("type", "SEARCH"),
+                "bidding_strategy": "MANUAL_CPC",  # Use manual CPC for copied campaigns
+                "target_locations": ["US"],  # Default to US targeting
+                "status": "PAUSED"  # Start paused so user can review
+            }
+            
+            # Create the new campaign
+            new_campaign_result = await self.create_campaign(**new_campaign_data)
+            
+            if new_campaign_result.get("success"):
+                return {
+                    "success": True,
+                    "source_campaign_id": source_campaign_id,
+                    "source_campaign_name": source_campaign.get("name"),
+                    "new_campaign_id": new_campaign_result.get("campaign_id"),
+                    "new_campaign_name": new_name,
+                    "new_budget": budget_amount or 50.0,
+                    "status": "PAUSED",
+                    "message": f"Campaign copied successfully. New campaign created in PAUSED state for review."
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to create new campaign",
+                    "details": new_campaign_result
+                }
+                
+        except GoogleAdsException as e:
+            logger.error(f"Failed to copy campaign: {e}")
+            return self.error_handler.format_error_response(e)
+        
+        except Exception as e:
+            logger.error(f"Unexpected error copying campaign: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "error_type": "UnexpectedError"
+            }

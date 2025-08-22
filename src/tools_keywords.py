@@ -327,3 +327,249 @@ class KeywordTools:
                 "error": str(e),
                 "error_type": "UnexpectedError"
             }
+    
+    async def update_keyword_bid(
+        self,
+        customer_id: str,
+        ad_group_id: str,
+        keyword_id: str,
+        cpc_bid_micros: int
+    ) -> Dict[str, Any]:
+        """Update the CPC bid for a specific keyword."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            ad_group_criterion_service = client.get_service("AdGroupCriterionService")
+            
+            # Create update operation
+            ad_group_criterion_operation = client.get_type("AdGroupCriterionOperation")
+            criterion = ad_group_criterion_operation.update
+            
+            # Set the criterion resource name
+            criterion.resource_name = client.get_service("AdGroupCriterionService").ad_group_criterion_path(
+                customer_id, ad_group_id, keyword_id
+            )
+            
+            # Update the CPC bid
+            criterion.cpc_bid_micros = cpc_bid_micros
+            
+            # Set update mask
+            from google.protobuf.field_mask_pb2 import FieldMask
+            ad_group_criterion_operation.update_mask = FieldMask(paths=["cpc_bid_micros"])
+            
+            # Execute the update
+            response = ad_group_criterion_service.mutate_ad_group_criteria(
+                customer_id=customer_id,
+                operations=[ad_group_criterion_operation]
+            )
+            
+            return {
+                "success": True,
+                "keyword_id": keyword_id,
+                "new_cpc_bid": micros_to_currency(cpc_bid_micros),
+                "new_cpc_bid_micros": cpc_bid_micros,
+                "resource_name": response.results[0].resource_name,
+            }
+            
+        except GoogleAdsException as e:
+            logger.error(f"Failed to update keyword bid: {e}")
+            raise
+    
+    async def delete_keyword(
+        self,
+        customer_id: str,
+        ad_group_id: str,
+        keyword_id: str
+    ) -> Dict[str, Any]:
+        """Delete a specific keyword."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            ad_group_criterion_service = client.get_service("AdGroupCriterionService")
+            
+            # Create remove operation
+            ad_group_criterion_operation = client.get_type("AdGroupCriterionOperation")
+            ad_group_criterion_operation.remove = client.get_service("AdGroupCriterionService").ad_group_criterion_path(
+                customer_id, ad_group_id, keyword_id
+            )
+            
+            # Execute the removal
+            response = ad_group_criterion_service.mutate_ad_group_criteria(
+                customer_id=customer_id,
+                operations=[ad_group_criterion_operation]
+            )
+            
+            return {
+                "success": True,
+                "keyword_id": keyword_id,
+                "message": "Keyword deleted successfully",
+                "resource_name": response.results[0].resource_name,
+            }
+            
+        except GoogleAdsException as e:
+            logger.error(f"Failed to delete keyword: {e}")
+            raise
+    
+    async def pause_keyword(
+        self,
+        customer_id: str,
+        ad_group_id: str,
+        keyword_id: str
+    ) -> Dict[str, Any]:
+        """Pause a specific keyword."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            ad_group_criterion_service = client.get_service("AdGroupCriterionService")
+            
+            # Create update operation
+            ad_group_criterion_operation = client.get_type("AdGroupCriterionOperation")
+            criterion = ad_group_criterion_operation.update
+            
+            # Set the criterion resource name
+            criterion.resource_name = client.get_service("AdGroupCriterionService").ad_group_criterion_path(
+                customer_id, ad_group_id, keyword_id
+            )
+            
+            # Set status to paused
+            criterion.status = client.enums.AdGroupCriterionStatusEnum.PAUSED
+            
+            # Set update mask
+            from google.protobuf.field_mask_pb2 import FieldMask
+            ad_group_criterion_operation.update_mask = FieldMask(paths=["status"])
+            
+            # Execute the update
+            response = ad_group_criterion_service.mutate_ad_group_criteria(
+                customer_id=customer_id,
+                operations=[ad_group_criterion_operation]
+            )
+            
+            return {
+                "success": True,
+                "keyword_id": keyword_id,
+                "status": "PAUSED",
+                "message": "Keyword paused successfully",
+                "resource_name": response.results[0].resource_name,
+            }
+            
+        except GoogleAdsException as e:
+            logger.error(f"Failed to pause keyword: {e}")
+            raise
+    
+    async def enable_keyword(
+        self,
+        customer_id: str,
+        ad_group_id: str,
+        keyword_id: str
+    ) -> Dict[str, Any]:
+        """Enable a paused keyword."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            ad_group_criterion_service = client.get_service("AdGroupCriterionService")
+            
+            # Create update operation
+            ad_group_criterion_operation = client.get_type("AdGroupCriterionOperation")
+            criterion = ad_group_criterion_operation.update
+            
+            # Set the criterion resource name
+            criterion.resource_name = client.get_service("AdGroupCriterionService").ad_group_criterion_path(
+                customer_id, ad_group_id, keyword_id
+            )
+            
+            # Set status to enabled
+            criterion.status = client.enums.AdGroupCriterionStatusEnum.ENABLED
+            
+            # Set update mask
+            from google.protobuf.field_mask_pb2 import FieldMask
+            ad_group_criterion_operation.update_mask = FieldMask(paths=["status"])
+            
+            # Execute the update
+            response = ad_group_criterion_service.mutate_ad_group_criteria(
+                customer_id=customer_id,
+                operations=[ad_group_criterion_operation]
+            )
+            
+            return {
+                "success": True,
+                "keyword_id": keyword_id,
+                "status": "ENABLED",
+                "message": "Keyword enabled successfully",
+                "resource_name": response.results[0].resource_name,
+            }
+            
+        except GoogleAdsException as e:
+            logger.error(f"Failed to enable keyword: {e}")
+            raise
+    
+    async def get_keyword_performance(
+        self,
+        customer_id: str,
+        ad_group_id: Optional[str] = None,
+        date_range: str = "LAST_30_DAYS"
+    ) -> Dict[str, Any]:
+        """Get keyword performance data with quality scores."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            googleads_service = client.get_service("GoogleAdsService")
+            
+            query = """
+                SELECT
+                    ad_group_criterion.criterion_id,
+                    ad_group_criterion.keyword.text,
+                    ad_group_criterion.keyword.match_type,
+                    ad_group_criterion.status,
+                    ad_group_criterion.cpc_bid_micros,
+                    ad_group_criterion.quality_info.quality_score,
+                    metrics.clicks,
+                    metrics.impressions,
+                    metrics.cost_micros,
+                    metrics.conversions,
+                    metrics.ctr,
+                    metrics.average_cpc,
+                    ad_group.name,
+                    ad_group.id
+                FROM keyword_view
+            """
+            
+            conditions = [f"segments.date DURING {date_range}"]
+            if ad_group_id:
+                conditions.append(f"ad_group.id = {ad_group_id}")
+            
+            query += " WHERE " + " AND ".join(conditions)
+            query += " ORDER BY metrics.clicks DESC"
+            
+            response = googleads_service.search(
+                customer_id=customer_id,
+                query=query
+            )
+            
+            keywords = []
+            for row in response:
+                keyword_data = {
+                    "keyword_id": str(row.ad_group_criterion.criterion_id),
+                    "text": str(row.ad_group_criterion.keyword.text),
+                    "match_type": str(row.ad_group_criterion.keyword.match_type.name),
+                    "status": str(row.ad_group_criterion.status.name),
+                    "cpc_bid": micros_to_currency(row.ad_group_criterion.cpc_bid_micros),
+                    "ad_group_name": str(row.ad_group.name),
+                    "ad_group_id": str(row.ad_group.id),
+                    "quality_score": row.ad_group_criterion.quality_info.quality_score or "N/A",
+                    "performance": {
+                        "clicks": int(row.metrics.clicks) if hasattr(row, 'metrics') else 0,
+                        "impressions": int(row.metrics.impressions) if hasattr(row, 'metrics') else 0,
+                        "cost": micros_to_currency(row.metrics.cost_micros) if hasattr(row, 'metrics') else 0,
+                        "conversions": float(row.metrics.conversions) if hasattr(row, 'metrics') else 0,
+                        "ctr": f"{row.metrics.ctr:.2%}" if hasattr(row, 'metrics') and row.metrics.ctr else "0.00%",
+                        "avg_cpc": micros_to_currency(row.metrics.average_cpc) if hasattr(row, 'metrics') else 0,
+                    }
+                }
+                keywords.append(keyword_data)
+            
+            return {
+                "success": True,
+                "date_range": date_range,
+                "ad_group_id": ad_group_id,
+                "keywords": keywords,
+                "count": len(keywords),
+            }
+            
+        except GoogleAdsException as e:
+            logger.error(f"Failed to get keyword performance: {e}")
+            raise
