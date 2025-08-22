@@ -341,3 +341,4 @@ class ExtensionTools:
         except GoogleAdsException as e:
             logger.error(f"Failed to delete extension: {e}")
             raise
+

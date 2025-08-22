@@ -545,3 +545,4 @@ class BiddingTools:
                 recommendations.append(f"📱 Mobile conversion rate low ({mobile_device['performance']['conversion_rate']}) - check mobile landing page experience")
         
         return recommendations
+

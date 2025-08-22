@@ -348,3 +348,4 @@ class AudienceTools:
         except GoogleAdsException as e:
             logger.error(f"Failed to get audience performance: {e}")
             raise
+
