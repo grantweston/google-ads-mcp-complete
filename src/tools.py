@@ -79,7 +79,7 @@ class GoogleAdsTools:
             },
             "update_campaign": {
                 "description": "Update campaign settings",
-                "handler": self.update_campaign,
+                "handler": self.campaign_tools.update_campaign,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "campaign_id": {"type": "string", "required": True},
@@ -91,7 +91,7 @@ class GoogleAdsTools:
             },
             "pause_campaign": {
                 "description": "Pause a running campaign",
-                "handler": self.pause_campaign,
+                "handler": self.campaign_tools.pause_campaign,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "campaign_id": {"type": "string", "required": True},
@@ -99,7 +99,7 @@ class GoogleAdsTools:
             },
             "resume_campaign": {
                 "description": "Resume a paused campaign",
-                "handler": self.resume_campaign,
+                "handler": self.campaign_tools.resume_campaign,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "campaign_id": {"type": "string", "required": True},
@@ -107,7 +107,7 @@ class GoogleAdsTools:
             },
             "list_campaigns": {
                 "description": "List all campaigns with optional filters",
-                "handler": self.list_campaigns,
+                "handler": self.campaign_tools.list_campaigns,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "status": {"type": "string"},
@@ -116,7 +116,7 @@ class GoogleAdsTools:
             },
             "get_campaign": {
                 "description": "Get detailed campaign information",
-                "handler": self.get_campaign,
+                "handler": self.campaign_tools.get_campaign,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "campaign_id": {"type": "string", "required": True},
@@ -284,7 +284,7 @@ class GoogleAdsTools:
             # Reporting & Analytics
             "get_campaign_performance": {
                 "description": "Get campaign performance metrics",
-                "handler": self.get_campaign_performance,
+                "handler": self.reporting_tools.get_campaign_performance,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "campaign_id": {"type": "string"},
@@ -294,7 +294,7 @@ class GoogleAdsTools:
             },
             "get_ad_group_performance": {
                 "description": "Get ad group performance metrics",
-                "handler": self.get_ad_group_performance,
+                "handler": self.reporting_tools.get_ad_group_performance,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string"},
@@ -303,7 +303,7 @@ class GoogleAdsTools:
             },
             "get_keyword_performance": {
                 "description": "Get keyword performance metrics",
-                "handler": self.get_keyword_performance,
+                "handler": self.reporting_tools.get_keyword_performance,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string"},
@@ -312,7 +312,7 @@ class GoogleAdsTools:
             },
             "run_gaql_query": {
                 "description": "Run custom GAQL queries",
-                "handler": self.run_gaql_query,
+                "handler": self.reporting_tools.run_gaql_query,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "query": {"type": "string", "required": True},
@@ -320,7 +320,7 @@ class GoogleAdsTools:
             },
             "get_search_terms_report": {
                 "description": "Get search terms report",
-                "handler": self.get_search_terms_report,
+                "handler": self.reporting_tools.get_search_terms_report,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "campaign_id": {"type": "string"},

@@ -240,7 +240,12 @@ class GoogleAdsAuthManager:
             List of customer account information.
         """
         try:
-            client = self.get_client()
+            # Use manager account (login customer ID) to access all customers
+            manager_customer_id = self.config.get("login_customer_id")
+            if not manager_customer_id:
+                raise AuthenticationError("login_customer_id is required to list accessible customers")
+                
+            client = self.get_client(manager_customer_id)
             customer_service = client.get_service("CustomerService")
             
             accessible_customers = customer_service.list_accessible_customers()
@@ -251,7 +256,7 @@ class GoogleAdsAuthManager:
             for resource_name in accessible_customers.resource_names:
                 customer_id = resource_name.split("/")[-1]
                 
-                # Get customer details
+                # Get customer details using manager account with proper login-customer-id
                 query = f"""
                     SELECT 
                         customer.id,
@@ -264,6 +269,7 @@ class GoogleAdsAuthManager:
                 """
                 
                 try:
+                    # Use manager account client to query any customer details
                     response = googleads_service.search(
                         customer_id=customer_id,
                         query=query,
@@ -281,6 +287,16 @@ class GoogleAdsAuthManager:
                         
                 except GoogleAdsException as e:
                     logger.warning(f"Failed to get details for customer {customer_id}: {e}")
+                    # Still add the customer with basic info if we can't get details
+                    customers.append({
+                        "id": customer_id,
+                        "name": f"Customer {customer_id}",
+                        "currency_code": "USD",
+                        "time_zone": "America/New_York", 
+                        "is_manager": False,
+                        "resource_name": resource_name,
+                        "access_limited": True,
+                    })
                     
             return customers
             

@@ -40,6 +40,10 @@ class GoogleAdsTools:
         # Campaign Management (from CampaignTools)
         tools.update(self._register_campaign_tools())
         
+        # Reporting & Analytics (from ReportingTools)
+        tools.update(self._register_reporting_tools())
+        
+        # Additional tool categories
         # Ad Group Management
         tools.update(self._register_ad_group_tools())
         
@@ -54,12 +58,9 @@ class GoogleAdsTools:
         
         # Keyword Management
         tools.update(self._register_keyword_tools())
-        
-        # Reporting & Analytics (from ReportingTools)
-        tools.update(self._register_reporting_tools())
-        
-        # Advanced Features
-        tools.update(self._register_advanced_tools())
+        # 
+        # # Advanced Features
+        # tools.update(self._register_advanced_tools())
         
         return tools
         
@@ -408,13 +409,26 @@ class GoogleAdsTools:
         """Get all tools in MCP format."""
         tools = []
         for name, config in self._tools_registry.items():
+            # Extract required parameters
+            required_params = []
+            properties = {}
+            
+            for param_name, param_config in config["parameters"].items():
+                # Create property schema without the 'required' field
+                prop_schema = {k: v for k, v in param_config.items() if k != "required"}
+                properties[param_name] = prop_schema
+                
+                # Add to required list if marked as required
+                if param_config.get("required", False):
+                    required_params.append(param_name)
+            
             tool = Tool(
                 name=name,
                 description=config["description"],
                 inputSchema={
                     "type": "object",
-                    "properties": config["parameters"],
-                    "required": [k for k, v in config["parameters"].items() if v.get("required", False)],
+                    "properties": properties,
+                    "required": required_params,
                 },
             )
             tools.append(tool)
@@ -436,6 +450,111 @@ class GoogleAdsTools:
         # Execute the handler
         return await handler(**arguments)
         
-    # Implement remaining tool methods...
+    # Account Management Methods
+    
+    async def list_accounts(self) -> Dict[str, Any]:
+        """List all accessible Google Ads accounts."""
+        try:
+            customers = self.auth_manager.get_accessible_customers()
+            return {
+                "success": True,
+                "accounts": customers,
+                "count": len(customers),
+            }
+        except Exception as e:
+            logger.error(f"Failed to list accounts: {e}")
+            raise
+            
+    async def get_account_info(self, customer_id: str) -> Dict[str, Any]:
+        """Get detailed account information."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            googleads_service = client.get_service("GoogleAdsService")
+            
+            query = """
+                SELECT
+                    customer.id,
+                    customer.descriptive_name,
+                    customer.currency_code,
+                    customer.time_zone,
+                    customer.auto_tagging_enabled,
+                    customer.manager,
+                    customer.test_account,
+                    customer.optimization_score,
+                    customer.optimization_score_weight
+                FROM customer
+                LIMIT 1
+            """
+            
+            response = googleads_service.search(
+                customer_id=customer_id,
+                query=query,
+            )
+            
+            for row in response:
+                return {
+                    "success": True,
+                    "account": {
+                        "id": str(row.customer.id),
+                        "name": row.customer.descriptive_name,
+                        "currency_code": row.customer.currency_code,
+                        "time_zone": row.customer.time_zone,
+                        "auto_tagging_enabled": row.customer.auto_tagging_enabled,
+                        "is_manager": row.customer.manager,
+                        "is_test_account": row.customer.test_account,
+                        "optimization_score": row.customer.optimization_score,
+                        "optimization_score_weight": row.customer.optimization_score_weight,
+                    },
+                }
+                
+            return {"success": False, "error": "Account not found"}
+            
+        except Exception as e:
+            logger.error(f"Failed to get account info: {e}")
+            raise
+            
+    async def get_account_hierarchy(self, customer_id: str) -> Dict[str, Any]:
+        """Get the account hierarchy tree."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            googleads_service = client.get_service("GoogleAdsService")
+            
+            query = """
+                SELECT
+                    customer_client.id,
+                    customer_client.descriptive_name,
+                    customer_client.manager,
+                    customer_client.level,
+                    customer_client.time_zone,
+                    customer_client.currency_code
+                FROM customer_client
+                WHERE customer_client.level <= 2
+            """
+            
+            response = googleads_service.search(
+                customer_id=customer_id,
+                query=query,
+            )
+            
+            hierarchy = []
+            for row in response:
+                hierarchy.append({
+                    "id": str(row.customer_client.id),
+                    "name": row.customer_client.descriptive_name,
+                    "is_manager": row.customer_client.manager,
+                    "level": row.customer_client.level,
+                    "time_zone": row.customer_client.time_zone,
+                    "currency_code": row.customer_client.currency_code,
+                })
+                
+            return {
+                "success": True,
+                "hierarchy": hierarchy,
+                "count": len(hierarchy),
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get account hierarchy: {e}")
+            raise
     # (Account, Ad Group, Ad, Asset, Budget, Keyword, and Advanced tools)
     # These would follow the same pattern as the campaign and reporting tools

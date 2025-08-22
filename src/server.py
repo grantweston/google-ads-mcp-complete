@@ -16,7 +16,7 @@ import structlog
 
 from .auth import GoogleAdsAuthManager, AuthenticationError
 from .error_handler import ErrorHandler, RetryableGoogleAdsClient
-from .tools import GoogleAdsTools
+from .tools_complete import GoogleAdsTools
 from .utils import format_currency, format_date_range, parse_date
 
 logger = structlog.get_logger(__name__)
@@ -53,11 +53,21 @@ class GoogleAdsMCPServer:
             try:
                 result = await self.tools.execute_tool(name, arguments or {})
                 
-                # Format result as TextContent
-                if isinstance(result, dict):
-                    content = json.dumps(result, indent=2)
-                else:
-                    content = str(result)
+                # Format result as TextContent with proper JSON serialization handling
+                try:
+                    if isinstance(result, dict):
+                        content = json.dumps(result, indent=2, default=str)
+                    else:
+                        content = str(result)
+                except (TypeError, ValueError) as json_error:
+                    # Handle JSON serialization errors
+                    logger.warning(f"JSON serialization failed for tool {name}: {json_error}")
+                    content = json.dumps({
+                        "success": False,
+                        "error": f"Response serialization failed: {str(json_error)}",
+                        "tool": name,
+                        "result_type": str(type(result))
+                    }, indent=2)
                     
                 return [TextContent(type="text", text=content)]
                 
@@ -71,9 +81,14 @@ class GoogleAdsMCPServer:
                 
                 # Add error details if it's a Google Ads exception
                 if hasattr(e, "__class__") and e.__class__.__name__ == "GoogleAdsException":
-                    error_response.update(self.error_handler.format_error_response(e))
+                    try:
+                        error_details = self.error_handler.format_error_response(e)
+                        error_response.update(error_details)
+                    except Exception as format_error:
+                        logger.warning(f"Failed to format Google Ads error: {format_error}")
+                        error_response["ads_error"] = str(e)
                     
-                return [TextContent(type="text", text=json.dumps(error_response, indent=2))]
+                return [TextContent(type="text", text=json.dumps(error_response, indent=2, default=str))]
                 
         @self.server.list_resources()
         async def handle_list_resources() -> List[str]:
