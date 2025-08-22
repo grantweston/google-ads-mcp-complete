@@ -262,7 +262,7 @@ class GoogleAdsTools:
                 },
             },
             "update_ad": {
-                "description": "Update an existing ad including headlines, descriptions, URLs, display paths, and status",
+                "description": "Update an existing ad",
                 "handler": self.ad_tools.update_ad,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
@@ -271,8 +271,6 @@ class GoogleAdsTools:
                     "headlines": {"type": "array"},
                     "descriptions": {"type": "array"},
                     "final_urls": {"type": "array"},
-                    "path1": {"type": "string"},
-                    "path2": {"type": "string"},
                     "status": {"type": "string"},
                 },
             },
@@ -303,13 +301,56 @@ class GoogleAdsTools:
                     "ad_id": {"type": "string", "required": True},
                 },
             },
-            "get_ad_strength_and_review_status": {
-                "description": "Get detailed ad strength ratings, review status, and quality recommendations",
-                "handler": self.ad_tools.get_ad_strength_and_review_status,
+            "compare_ad_performance": {
+                "description": "Compare performance of multiple ads side-by-side with efficiency analysis",
+                "handler": self.ad_tools.compare_ad_performance,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_ids": {"type": "array", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                },
+            },
+            "get_ad_group_performance_ranking": {
+                "description": "Rank all ads in an ad group by performance metrics (CTR, ROAS, efficiency)",
+                "handler": self.ad_tools.get_ad_group_performance_ranking,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                    "sort_by": {"type": "string", "default": "efficiency_score"},
+                },
+            },
+            "identify_optimization_opportunities": {
+                "description": "Auto-identify which ads to pause, optimize, or scale based on performance",
+                "handler": self.ad_tools.identify_optimization_opportunities,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string"},
                     "campaign_id": {"type": "string"},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                    "min_clicks": {"type": "number", "default": 10},
+                },
+            },
+            "calculate_roas_by_ad": {
+                "description": "Calculate Return on Ad Spend (ROAS) for each ad with profitability analysis",
+                "handler": self.ad_tools.calculate_roas_by_ad,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string"},
+                    "campaign_id": {"type": "string"},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                    "min_cost": {"type": "number", "default": 5.0},
+                },
+            },
+            "analyze_ad_strength_trends": {
+                "description": "Analyze how ad strength ratings correlate with performance trends over time",
+                "handler": self.ad_tools.analyze_ad_strength_trends,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "current_date_range": {"type": "string", "default": "LAST_7_DAYS"},
+                    "comparison_date_range": {"type": "string", "default": "LAST_30_DAYS"},
                 },
             },
         }
