@@ -316,6 +316,8 @@ class AdTools:
         headlines: Optional[List[str]] = None,
         descriptions: Optional[List[str]] = None,
         final_urls: Optional[List[str]] = None,
+        path1: Optional[str] = None,
+        path2: Optional[str] = None,
         status: Optional[str] = None
     ) -> Dict[str, Any]:
         """Update an existing ad."""
@@ -345,7 +347,7 @@ class AdTools:
                 update_mask.paths.append("status")
             
             # Update ad content if provided (for responsive search ads)
-            if headlines or descriptions or final_urls:
+            if headlines or descriptions or final_urls or path1 is not None or path2 is not None:
                 if headlines:
                     ad_group_ad.ad.responsive_search_ad.headlines.clear()
                     for i, headline in enumerate(headlines[:15]):  # Max 15 headlines
@@ -366,6 +368,15 @@ class AdTools:
                     ad_group_ad.ad.final_urls.clear()
                     ad_group_ad.ad.final_urls.extend(final_urls)
                     update_mask.paths.append("ad.final_urls")
+                
+                # Update display paths
+                if path1 is not None:
+                    ad_group_ad.ad.responsive_search_ad.path1 = path1
+                    update_mask.paths.append("ad.responsive_search_ad.path1")
+                
+                if path2 is not None:
+                    ad_group_ad.ad.responsive_search_ad.path2 = path2
+                    update_mask.paths.append("ad.responsive_search_ad.path2")
             
             # Set the update mask
             ad_group_ad_operation.update_mask = update_mask
@@ -438,3 +449,169 @@ class AdTools:
         except GoogleAdsException as e:
             logger.error(f"Failed to delete ad: {e}")
             raise
+    
+    async def get_ad_strength_and_review_status(
+        self,
+        customer_id: str,
+        ad_group_id: Optional[str] = None,
+        campaign_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get detailed ad strength, quality ratings, and review status for ads."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            googleads_service = client.get_service("GoogleAdsService")
+            
+            # Enhanced query to get ad strength, review status, and policy info
+            query = """
+                SELECT
+                    ad_group_ad.ad.id,
+                    ad_group_ad.ad.name,
+                    ad_group_ad.status,
+                    ad_group_ad.policy_summary.review_status,
+                    ad_group_ad.policy_summary.approval_status,
+                    ad_group_ad.ad.responsive_search_ad.headlines,
+                    ad_group_ad.ad.responsive_search_ad.descriptions,
+                    ad_group_ad.ad.responsive_search_ad.path1,
+                    ad_group_ad.ad.responsive_search_ad.path2,
+                    ad_group_ad.ad.final_urls,
+                    ad_group_ad.ad.type,
+                    ad_group_ad.strength,
+                    ad_group.id,
+                    ad_group.name,
+                    campaign.id,
+                    campaign.name,
+                    metrics.clicks,
+                    metrics.impressions,
+                    metrics.ctr
+                FROM ad_group_ad
+                WHERE segments.date DURING LAST_30_DAYS
+            """
+            
+            # Add filters
+            conditions = []
+            if ad_group_id:
+                conditions.append(f"ad_group.id = {ad_group_id}")
+            if campaign_id:
+                conditions.append(f"campaign.id = {campaign_id}")
+                
+            if conditions:
+                query += " AND " + " AND ".join(conditions)
+            
+            query += " ORDER BY ad_group_ad.ad.id"
+            
+            response = googleads_service.search(
+                customer_id=customer_id, query=query
+            )
+            
+            ads_details = []
+            for row in response:
+                ad_data = {
+                    "ad_id": str(row.ad_group_ad.ad.id),
+                    "ad_name": str(row.ad_group_ad.ad.name) if row.ad_group_ad.ad.name else f"Ad {row.ad_group_ad.ad.id}",
+                    "ad_type": str(row.ad_group_ad.ad.type_.name),
+                    "status": str(row.ad_group_ad.status.name),
+                    "ad_group_name": str(row.ad_group.name),
+                    "campaign_name": str(row.campaign.name),
+                    
+                    # Ad Strength & Quality
+                    "ad_strength": str(row.ad_group_ad.strength.name) if hasattr(row.ad_group_ad, 'strength') and row.ad_group_ad.strength else "NOT_AVAILABLE",
+                    
+                    # Review & Policy Status
+                    "review_status": str(row.ad_group_ad.policy_summary.review_status.name) if hasattr(row.ad_group_ad, 'policy_summary') else "UNKNOWN",
+                    "approval_status": str(row.ad_group_ad.policy_summary.approval_status.name) if hasattr(row.ad_group_ad, 'policy_summary') else "UNKNOWN",
+                    
+                    # Performance
+                    "performance": {
+                        "clicks": int(row.metrics.clicks) if hasattr(row, 'metrics') else 0,
+                        "impressions": int(row.metrics.impressions) if hasattr(row, 'metrics') else 0,
+                        "ctr": f"{row.metrics.ctr:.2%}" if hasattr(row, 'metrics') and row.metrics.ctr else "0.00%",
+                    }
+                }
+                
+                # Add ad content details
+                if row.ad_group_ad.ad.type_.name == "RESPONSIVE_SEARCH_AD":
+                    headlines = [str(h.text) for h in row.ad_group_ad.ad.responsive_search_ad.headlines]
+                    descriptions = [str(d.text) for d in row.ad_group_ad.ad.responsive_search_ad.descriptions]
+                    
+                    ad_data["ad_content"] = {
+                        "headlines": headlines,
+                        "descriptions": descriptions,
+                        "display_path1": str(row.ad_group_ad.ad.responsive_search_ad.path1) if row.ad_group_ad.ad.responsive_search_ad.path1 else "",
+                        "display_path2": str(row.ad_group_ad.ad.responsive_search_ad.path2) if row.ad_group_ad.ad.responsive_search_ad.path2 else "",
+                        "final_urls": [str(url) for url in row.ad_group_ad.ad.final_urls],
+                        "headline_count": len(headlines),
+                        "description_count": len(descriptions),
+                    }
+                    
+                    # Add strength analysis
+                    ad_data["strength_analysis"] = {
+                        "headline_diversity": len(set(headlines)),
+                        "description_diversity": len(set(descriptions)),
+                        "min_headlines_met": len(headlines) >= 3,
+                        "optimal_headlines": len(headlines) >= 8,
+                        "min_descriptions_met": len(descriptions) >= 2,
+                        "optimal_descriptions": len(descriptions) >= 4,
+                        "has_display_paths": bool(row.ad_group_ad.ad.responsive_search_ad.path1 or row.ad_group_ad.ad.responsive_search_ad.path2),
+                    }
+                
+                ads_details.append(ad_data)
+            
+            # Summary statistics
+            total_ads = len(ads_details)
+            strength_summary = {}
+            review_status_summary = {}
+            
+            for ad in ads_details:
+                strength = ad["ad_strength"]
+                review = ad["review_status"]
+                
+                strength_summary[strength] = strength_summary.get(strength, 0) + 1
+                review_status_summary[review] = review_status_summary.get(review, 0) + 1
+            
+            return {
+                "success": True,
+                "total_ads": total_ads,
+                "strength_summary": strength_summary,
+                "review_status_summary": review_status_summary,
+                "ads": ads_details,
+                "recommendations": self._generate_ad_strength_recommendations(ads_details)
+            }
+            
+        except GoogleAdsException as e:
+            logger.error(f"Failed to get ad strength and review status: {e}")
+            raise
+    
+    def _generate_ad_strength_recommendations(self, ads_details: List[Dict]) -> List[str]:
+        """Generate recommendations to improve ad strength."""
+        recommendations = []
+        
+        poor_ads = [ad for ad in ads_details if ad["ad_strength"] == "POOR"]
+        
+        if poor_ads:
+            recommendations.append(f"🚨 {len(poor_ads)} ads have POOR strength ratings")
+            
+            for ad in poor_ads:
+                if "strength_analysis" in ad:
+                    analysis = ad["strength_analysis"]
+                    ad_recs = []
+                    
+                    if not analysis["optimal_headlines"]:
+                        ad_recs.append(f"Add more headlines ({analysis['headline_count']}/15 - aim for 8-15)")
+                    
+                    if not analysis["optimal_descriptions"]:
+                        ad_recs.append(f"Add more descriptions ({analysis['description_count']}/4 - aim for 4)")
+                    
+                    if not analysis["has_display_paths"]:
+                        ad_recs.append("Add display paths (path1/path2) for better visibility")
+                    
+                    if analysis["headline_diversity"] < analysis["headline_count"]:
+                        ad_recs.append("Make headlines more unique/diverse")
+                    
+                    if ad_recs:
+                        recommendations.append(f"  • Ad '{ad['ad_name']}': {', '.join(ad_recs)}")
+        
+        pending_ads = [ad for ad in ads_details if ad["review_status"] in ["UNDER_REVIEW", "PENDING"]]
+        if pending_ads:
+            recommendations.append(f"⏳ {len(pending_ads)} ads are pending review - performance data may be limited")
+        
+        return recommendations

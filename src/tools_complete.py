@@ -262,7 +262,7 @@ class GoogleAdsTools:
                 },
             },
             "update_ad": {
-                "description": "Update an existing ad",
+                "description": "Update an existing ad including headlines, descriptions, URLs, display paths, and status",
                 "handler": self.ad_tools.update_ad,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
@@ -271,6 +271,8 @@ class GoogleAdsTools:
                     "headlines": {"type": "array"},
                     "descriptions": {"type": "array"},
                     "final_urls": {"type": "array"},
+                    "path1": {"type": "string"},
+                    "path2": {"type": "string"},
                     "status": {"type": "string"},
                 },
             },
@@ -299,6 +301,15 @@ class GoogleAdsTools:
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string", "required": True},
                     "ad_id": {"type": "string", "required": True},
+                },
+            },
+            "get_ad_strength_and_review_status": {
+                "description": "Get detailed ad strength ratings, review status, and quality recommendations",
+                "handler": self.ad_tools.get_ad_strength_and_review_status,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string"},
+                    "campaign_id": {"type": "string"},
                 },
             },
         }
