@@ -18,6 +18,9 @@ from .tools_keywords import KeywordTools
 from .tools_budgets import BudgetTools
 from .tools_assets import AssetTools
 from .tools_extensions import ExtensionTools
+from .tools_audiences import AudienceTools
+from .tools_geography import GeographyTools
+from .tools_bidding import BiddingTools
 from .utils import currency_to_micros, micros_to_currency
 
 logger = structlog.get_logger(__name__)
@@ -39,6 +42,9 @@ class GoogleAdsTools:
         self.budget_tools = BudgetTools(auth_manager, error_handler)
         self.asset_tools = AssetTools(auth_manager, error_handler)
         self.extension_tools = ExtensionTools(auth_manager, error_handler)
+        self.audience_tools = AudienceTools(auth_manager, error_handler)
+        self.geography_tools = GeographyTools(auth_manager, error_handler)
+        self.bidding_tools = BiddingTools(auth_manager, error_handler)
         
         self._tools_registry = self._register_all_tools()
         
@@ -73,6 +79,18 @@ class GoogleAdsTools:
         
         # Extension Management
         tools.update(self._register_extension_tools())
+        
+        # Search Terms & Negative Keyword Intelligence
+        tools.update(self._register_search_intelligence_tools())
+        
+        # Audience Management & Targeting
+        tools.update(self._register_audience_tools())
+        
+        # Geographic Performance & Targeting
+        tools.update(self._register_geography_tools())
+        
+        # Bidding Strategy & Bid Adjustments
+        tools.update(self._register_bidding_tools())
         
         # # Advanced Features
         # tools.update(self._register_advanced_tools())
@@ -778,5 +796,155 @@ class GoogleAdsTools:
         except Exception as e:
             logger.error(f"Failed to get account hierarchy: {e}")
             raise
+    
+    def _register_search_intelligence_tools(self) -> Dict[str, Dict[str, Any]]:
+        """Register search terms analysis and negative keyword intelligence tools."""
+        return {
+            "auto_suggest_negative_keywords": {
+                "description": "Auto-suggest negative keywords based on wasteful search terms analysis",
+                "handler": self.keyword_tools.auto_suggest_negative_keywords,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string"},
+                    "ad_group_id": {"type": "string"},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                    "min_cost": {"type": "number", "default": 5.0},
+                    "max_suggestions": {"type": "number", "default": 50},
+                },
+            },
+            "get_search_terms_insights": {
+                "description": "Get comprehensive search terms analysis with keyword expansion opportunities",
+                "handler": self.keyword_tools.get_search_terms_insights,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string"},
+                    "ad_group_id": {"type": "string"},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                    "min_impressions": {"type": "number", "default": 5},
+                },
+            },
+        }
+    
+    def _register_audience_tools(self) -> Dict[str, Dict[str, Any]]:
+        """Register audience management and targeting tools."""
+        return {
+            "create_custom_audience": {
+                "description": "Create a custom audience for targeting (remarketing, customer match)",
+                "handler": self.audience_tools.create_custom_audience,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "name": {"type": "string", "required": True},
+                    "audience_type": {"type": "string", "required": True},
+                    "rules": {"type": "object", "required": True},
+                    "description": {"type": "string"},
+                },
+            },
+            "add_audience_targeting": {
+                "description": "Add audience targeting to an ad group",
+                "handler": self.audience_tools.add_audience_targeting,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "audience_id": {"type": "string", "required": True},
+                    "targeting_mode": {"type": "string", "default": "TARGETING"},
+                    "bid_modifier": {"type": "number"},
+                },
+            },
+            "list_audiences": {
+                "description": "List all available audiences/user lists",
+                "handler": self.audience_tools.list_audiences,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "audience_type": {"type": "string"},
+                },
+            },
+            "get_audience_performance": {
+                "description": "Get performance data for audience targeting",
+                "handler": self.audience_tools.get_audience_performance,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "audience_id": {"type": "string"},
+                    "campaign_id": {"type": "string"},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                },
+            },
+        }
+    
+    def _register_geography_tools(self) -> Dict[str, Dict[str, Any]]:
+        """Register geographic performance and targeting tools."""
+        return {
+            "get_location_performance": {
+                "description": "Get performance data by geographic location with optimization insights",
+                "handler": self.geography_tools.get_location_performance,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string"},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                    "location_type": {"type": "string", "default": "COUNTRY_AND_REGION"},
+                },
+            },
+            "optimize_geographic_targeting": {
+                "description": "Auto-analyze geographic performance and suggest targeting optimizations",
+                "handler": self.geography_tools.optimize_geographic_targeting,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string", "required": True},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                    "min_cost_threshold": {"type": "number", "default": 20.0},
+                    "poor_roas_threshold": {"type": "number", "default": 1.0},
+                },
+            },
+        }
+    
+    def _register_bidding_tools(self) -> Dict[str, Dict[str, Any]]:
+        """Register bidding strategy and bid adjustment tools."""
+        return {
+            "set_bid_adjustments": {
+                "description": "Set bid adjustments for campaign (device, location, demographic)",
+                "handler": self.bidding_tools.set_bid_adjustments,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string", "required": True},
+                    "adjustments": {"type": "object", "required": True},
+                },
+            },
+            "get_bid_adjustment_performance": {
+                "description": "Get performance data for current bid adjustments",
+                "handler": self.bidding_tools.get_bid_adjustment_performance,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string", "required": True},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                },
+            },
+            "create_portfolio_bidding_strategy": {
+                "description": "Create a portfolio bidding strategy for sharing across campaigns",
+                "handler": self.bidding_tools.create_portfolio_bidding_strategy,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "name": {"type": "string", "required": True},
+                    "strategy_type": {"type": "string", "required": True},
+                    "target_cpa_micros": {"type": "number"},
+                    "target_roas": {"type": "number"},
+                },
+            },
+            "list_bidding_strategies": {
+                "description": "List all bidding strategies in the account",
+                "handler": self.bidding_tools.list_bidding_strategies,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                },
+            },
+            "get_device_performance": {
+                "description": "Get performance breakdown by device type (mobile, desktop, tablet)",
+                "handler": self.bidding_tools.get_device_performance,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string"},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
+                },
+            },
+        }
+    
     # (Account, Ad Group, Ad, Asset, Budget, Keyword, and Advanced tools)
     # These would follow the same pattern as the campaign and reporting tools
