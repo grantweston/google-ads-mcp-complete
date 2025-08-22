@@ -238,6 +238,46 @@ class GoogleAdsTools:
                     "status": {"type": "string"},
                 },
             },
+            "update_ad": {
+                "description": "Update an existing ad",
+                "handler": self.ad_tools.update_ad,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "ad_id": {"type": "string", "required": True},
+                    "headlines": {"type": "array"},
+                    "descriptions": {"type": "array"},
+                    "final_urls": {"type": "array"},
+                    "status": {"type": "string"},
+                },
+            },
+            "pause_ad": {
+                "description": "Pause a specific ad",
+                "handler": self.ad_tools.pause_ad,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "ad_id": {"type": "string", "required": True},
+                },
+            },
+            "enable_ad": {
+                "description": "Enable a specific ad",
+                "handler": self.ad_tools.enable_ad,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "ad_id": {"type": "string", "required": True},
+                },
+            },
+            "delete_ad": {
+                "description": "Delete a specific ad",
+                "handler": self.ad_tools.delete_ad,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "ad_group_id": {"type": "string", "required": True},
+                    "ad_id": {"type": "string", "required": True},
+                },
+            },
         }
         
     def _register_asset_tools(self) -> Dict[str, Dict[str, Any]]:

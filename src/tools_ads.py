@@ -307,3 +307,134 @@ class AdTools:
                 "error": str(e),
                 "error_type": "UnexpectedError"
             }
+    
+    async def update_ad(
+        self,
+        customer_id: str,
+        ad_group_id: str,
+        ad_id: str,
+        headlines: Optional[List[str]] = None,
+        descriptions: Optional[List[str]] = None,
+        final_urls: Optional[List[str]] = None,
+        status: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Update an existing ad."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            ad_group_ad_service = client.get_service("AdGroupAdService")
+            
+            # Create update operation
+            ad_group_ad_operation = client.get_type("AdGroupAdOperation")
+            ad_group_ad = ad_group_ad_operation.update
+            
+            # Set the ad resource name
+            ad_group_ad.resource_name = client.get_service("AdGroupAdService").ad_group_ad_path(
+                customer_id, ad_group_id, ad_id
+            )
+            
+            # Update fields based on what's provided
+            from google.protobuf.field_mask_pb2 import FieldMask
+            update_mask = FieldMask()
+            
+            # Update status if provided
+            if status:
+                if status.upper() == "ENABLED":
+                    ad_group_ad.status = client.enums.AdGroupAdStatusEnum.ENABLED
+                elif status.upper() == "PAUSED":
+                    ad_group_ad.status = client.enums.AdGroupAdStatusEnum.PAUSED
+                update_mask.paths.append("status")
+            
+            # Update ad content if provided (for responsive search ads)
+            if headlines or descriptions or final_urls:
+                if headlines:
+                    ad_group_ad.ad.responsive_search_ad.headlines.clear()
+                    for i, headline in enumerate(headlines[:15]):  # Max 15 headlines
+                        headline_asset = client.get_type("AdTextAsset")
+                        headline_asset.text = headline
+                        ad_group_ad.ad.responsive_search_ad.headlines.append(headline_asset)
+                    update_mask.paths.append("ad.responsive_search_ad.headlines")
+                
+                if descriptions:
+                    ad_group_ad.ad.responsive_search_ad.descriptions.clear()
+                    for i, description in enumerate(descriptions[:4]):  # Max 4 descriptions
+                        description_asset = client.get_type("AdTextAsset")
+                        description_asset.text = description
+                        ad_group_ad.ad.responsive_search_ad.descriptions.append(description_asset)
+                    update_mask.paths.append("ad.responsive_search_ad.descriptions")
+                
+                if final_urls:
+                    ad_group_ad.ad.final_urls.clear()
+                    ad_group_ad.ad.final_urls.extend(final_urls)
+                    update_mask.paths.append("ad.final_urls")
+            
+            # Set the update mask
+            ad_group_ad_operation.update_mask = update_mask
+            
+            # Execute the update
+            response = ad_group_ad_service.mutate_ad_group_ads(
+                customer_id=customer_id,
+                operations=[ad_group_ad_operation]
+            )
+            
+            return {
+                "success": True,
+                "ad_id": ad_id,
+                "updated_fields": list(update_mask.paths),
+                "resource_name": response.results[0].resource_name,
+            }
+            
+        except GoogleAdsException as e:
+            logger.error(f"Failed to update ad: {e}")
+            raise
+    
+    async def pause_ad(
+        self,
+        customer_id: str,
+        ad_group_id: str,
+        ad_id: str
+    ) -> Dict[str, Any]:
+        """Pause a specific ad."""
+        return await self.update_ad(customer_id, ad_group_id, ad_id, status="PAUSED")
+    
+    async def enable_ad(
+        self,
+        customer_id: str,
+        ad_group_id: str,
+        ad_id: str
+    ) -> Dict[str, Any]:
+        """Enable a specific ad."""
+        return await self.update_ad(customer_id, ad_group_id, ad_id, status="ENABLED")
+    
+    async def delete_ad(
+        self,
+        customer_id: str,
+        ad_group_id: str,
+        ad_id: str
+    ) -> Dict[str, Any]:
+        """Delete a specific ad."""
+        try:
+            client = self.auth_manager.get_client(customer_id)
+            ad_group_ad_service = client.get_service("AdGroupAdService")
+            
+            # Create remove operation
+            ad_group_ad_operation = client.get_type("AdGroupAdOperation")
+            ad_group_ad_operation.remove = client.get_service("AdGroupAdService").ad_group_ad_path(
+                customer_id, ad_group_id, ad_id
+            )
+            
+            # Execute the removal
+            response = ad_group_ad_service.mutate_ad_group_ads(
+                customer_id=customer_id,
+                operations=[ad_group_ad_operation]
+            )
+            
+            return {
+                "success": True,
+                "ad_id": ad_id,
+                "message": "Ad deleted successfully",
+                "resource_name": response.results[0].resource_name,
+            }
+            
+        except GoogleAdsException as e:
+            logger.error(f"Failed to delete ad: {e}")
+            raise
