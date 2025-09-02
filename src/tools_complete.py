@@ -140,7 +140,7 @@ class GoogleAdsTools:
                 },
             },
             "update_campaign": {
-                "description": "Update campaign settings",
+                "description": "Update campaign settings including assigning portfolio bidding strategies",
                 "handler": self.campaign_tools.update_campaign,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
@@ -149,6 +149,7 @@ class GoogleAdsTools:
                     "status": {"type": "string"},
                     "start_date": {"type": "string"},
                     "end_date": {"type": "string"},
+                    "bidding_strategy": {"type": "string"},
                 },
             },
             "pause_campaign": {
@@ -200,6 +201,24 @@ class GoogleAdsTools:
                     "source_campaign_id": {"type": "string", "required": True},
                     "new_name": {"type": "string", "required": True},
                     "budget_amount": {"type": "number"},
+                },
+            },
+            "create_ad_schedule": {
+                "description": "Create ad schedules (dayparting) for a campaign with specific days, hours, and bid adjustments",
+                "handler": self.campaign_tools.create_ad_schedule,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string", "required": True},
+                    "schedules": {"type": "array", "required": True},
+                },
+            },
+            "get_campaign_overview": {
+                "description": "Get comprehensive high-level campaign overview showing keywords, extensions, scheduling, audiences, performance, and optimization score",
+                "handler": self.campaign_tools.get_campaign_overview,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string", "required": True},
+                    "date_range": {"type": "string", "default": "LAST_30_DAYS"},
                 },
             },
         }
@@ -449,13 +468,13 @@ class GoogleAdsTools:
                 },
             },
             "add_negative_keywords": {
-                "description": "Add negative keywords (campaign or ad group level)",
+                "description": "Add negative keywords (campaign or ad group level). SYNTAX: keywords=['free','cheap','demo'] as array of strings. Use EITHER campaign_id OR ad_group_id, not both. Tool automatically creates KeywordInfo protobuf objects.",
                 "handler": self.keyword_tools.add_negative_keywords,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
-                    "keywords": {"type": "array", "required": True},
-                    "campaign_id": {"type": "string"},
-                    "ad_group_id": {"type": "string"},
+                    "keywords": {"type": "array", "required": True, "description": "Array of negative keyword strings, e.g. ['free', 'cheap', 'demo']"},
+                    "campaign_id": {"type": "string", "description": "For campaign-level negative keywords"},
+                    "ad_group_id": {"type": "string", "description": "For ad group-level negative keywords"},
                 },
             },
             "list_keywords": {
@@ -519,12 +538,12 @@ class GoogleAdsTools:
         """Register extension management tools."""
         return {
             "create_sitelink_extensions": {
-                "description": "Create sitelink extensions for a campaign",
+                "description": "Create sitelink extensions for a campaign. SYNTAX: sitelinks=[{'text':'Features','url':'https://site.com/features','description1':'Optional desc'}]",
                 "handler": self.extension_tools.create_sitelink_extensions,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "campaign_id": {"type": "string", "required": True},
-                    "sitelinks": {"type": "array", "required": True},
+                    "sitelinks": {"type": "array", "required": True, "description": "Array of objects with 'text', 'url', optional 'description1', 'description2'"},
                 },
             },
             "create_callout_extensions": {
@@ -534,6 +553,15 @@ class GoogleAdsTools:
                     "customer_id": {"type": "string", "required": True},
                     "campaign_id": {"type": "string", "required": True},
                     "callouts": {"type": "array", "required": True},
+                },
+            },
+            "create_structured_snippet_extensions": {
+                "description": "Create structured snippet extensions for a campaign. SYNTAX: structured_snippets=[{'header':'SERVICE_CATALOG','values':['Web Design','SEO']}]. Valid headers: AMENITIES, BRANDS, COURSES, DESTINATIONS, MODELS, SERVICE_CATALOG, SERVICES, FEATURES (maps to SERVICE_CATALOG), STYLES, TYPES.",
+                "handler": self.extension_tools.create_structured_snippet_extensions,
+                "parameters": {
+                    "customer_id": {"type": "string", "required": True},
+                    "campaign_id": {"type": "string", "required": True},
+                    "structured_snippets": {"type": "array", "required": True, "description": "Array of objects with 'header' (predefined Google value) and 'values' (array of strings)"},
                 },
             },
             "create_call_extensions": {
@@ -597,14 +625,14 @@ class GoogleAdsTools:
                     "date_range": {"type": "string", "default": "LAST_30_DAYS"},
                 },
             },
-            "run_gaql_query": {
-                "description": "Run custom GAQL queries",
-                "handler": self.reporting_tools.run_gaql_query,
-                "parameters": {
-                    "customer_id": {"type": "string", "required": True},
-                    "query": {"type": "string", "required": True},
-                },
-            },
+            # "run_gaql_query": {
+            #     "description": "Run custom GAQL queries",
+            #     "handler": self.reporting_tools.run_gaql_query,
+            #     "parameters": {
+            #         "customer_id": {"type": "string", "required": True},
+            #         "query": {"type": "string", "required": True},
+            #     },
+            # },
             "get_search_terms_report": {
                 "description": "Get search terms report",
                 "handler": self.reporting_tools.get_search_terms_report,
@@ -840,14 +868,14 @@ class GoogleAdsTools:
                 },
             },
             "add_audience_targeting": {
-                "description": "Add audience targeting to an ad group",
+                "description": "Add audience targeting to an ad group. SYNTAX: audience_id can be just ID ('375' for user interests, '9088079237' for user lists) or full resource name ('customers/123/userLists/456'). Tool auto-detects type: 8+ digits = user list, shorter = user interest.",
                 "handler": self.audience_tools.add_audience_targeting,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
                     "ad_group_id": {"type": "string", "required": True},
-                    "audience_id": {"type": "string", "required": True},
-                    "targeting_mode": {"type": "string", "default": "TARGETING"},
-                    "bid_modifier": {"type": "number"},
+                    "audience_id": {"type": "string", "required": True, "description": "User interest ID ('375'), user list ID ('9088079237'), or full resource name ('customers/123/userLists/456')"},
+                    "targeting_mode": {"type": "string", "default": "TARGETING", "description": "TARGETING or OBSERVATION"},
+                    "bid_modifier": {"type": "number", "description": "Bid adjustment, e.g. 1.2 for +20%"},
                 },
             },
             "list_audiences": {
@@ -918,7 +946,7 @@ class GoogleAdsTools:
                 },
             },
             "create_portfolio_bidding_strategy": {
-                "description": "Create a portfolio bidding strategy for sharing across campaigns",
+                "description": "Create a portfolio bidding strategy for sharing across campaigns. For TARGET_IMPRESSION_SHARE, use strategy_config with location, impression_share_target, and optionally max_cpc_bid_limit_micros.",
                 "handler": self.bidding_tools.create_portfolio_bidding_strategy,
                 "parameters": {
                     "customer_id": {"type": "string", "required": True},
@@ -926,6 +954,7 @@ class GoogleAdsTools:
                     "strategy_type": {"type": "string", "required": True},
                     "target_cpa_micros": {"type": "number"},
                     "target_roas": {"type": "number"},
+                    "strategy_config": {"type": "object"},
                 },
             },
             "list_bidding_strategies": {

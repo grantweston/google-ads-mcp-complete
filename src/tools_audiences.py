@@ -120,7 +120,11 @@ class AudienceTools:
         Args:
             customer_id: The customer ID
             ad_group_id: The ad group ID
-            audience_id: The audience/user list ID
+            audience_id: The audience resource name OR just the ID (will auto-detect type)
+                Examples:
+                - "customers/123/userLists/456" (full resource name)
+                - "customers/123/userInterests/375" (full resource name)
+                - "375" (just ID - will be treated as user interest)
             targeting_mode: TARGETING (restrict to audience) or OBSERVATION (collect data)
             bid_modifier: Optional bid adjustment (e.g., 1.2 for +20%)
         """
@@ -137,17 +141,34 @@ class AudienceTools:
                 customer_id, ad_group_id
             )
             
-            # Set audience criterion
-            criterion.user_list.user_list = client.get_service("UserListService").user_list_path(
-                customer_id, audience_id
-            )
-            
-            # Set targeting mode
-            if targeting_mode.upper() == "OBSERVATION":
-                criterion.type_ = client.enums.CriterionTypeEnum.USER_LIST
-                # For observation mode, we just collect data without restricting targeting
+            # Determine audience type and construct proper resource name
+            if audience_id.startswith("customers/"):
+                # Full resource name provided
+                audience_resource_name = audience_id
+                if "/userLists/" in audience_id:
+                    criterion.user_list.user_list = audience_resource_name
+                    criterion.type_ = client.enums.CriterionTypeEnum.USER_LIST
+                elif "/userInterests/" in audience_id:
+                    criterion.user_interest.user_interest_category = audience_resource_name
+                    criterion.type_ = client.enums.CriterionTypeEnum.USER_INTEREST
+                elif "/customAudiences/" in audience_id:
+                    criterion.custom_audience.custom_audience = audience_resource_name
+                    criterion.type_ = client.enums.CriterionTypeEnum.CUSTOM_AUDIENCE
+                else:
+                    raise ValueError(f"Unsupported audience resource type: {audience_id}")
             else:
-                criterion.type_ = client.enums.CriterionTypeEnum.USER_LIST
+                # Just ID provided - need to determine if it's a user list or user interest
+                # User interests are typically short IDs (1-4 digits), user lists are longer (10+ digits)
+                if len(audience_id) >= 8 and audience_id.isdigit():
+                    # Likely a user list ID (remarketing list)
+                    audience_resource_name = f"customers/{customer_id}/userLists/{audience_id}"
+                    criterion.user_list.user_list = audience_resource_name
+                    criterion.type_ = client.enums.CriterionTypeEnum.USER_LIST
+                else:
+                    # Likely a user interest ID (Google predefined audience)
+                    audience_resource_name = f"customers/{customer_id}/userInterests/{audience_id}"
+                    criterion.user_interest.user_interest_category = audience_resource_name
+                    criterion.type_ = client.enums.CriterionTypeEnum.USER_INTEREST
             
             # Set bid modifier if provided
             if bid_modifier:
@@ -166,9 +187,10 @@ class AudienceTools:
                 "success": True,
                 "ad_group_id": ad_group_id,
                 "audience_id": audience_id,
+                "audience_resource_name": audience_resource_name,
                 "targeting_mode": targeting_mode,
                 "bid_modifier": bid_modifier,
-                "resource_name": response.results[0].resource_name,
+                "ad_group_criterion_resource_name": response.results[0].resource_name,
                 "message": f"Audience targeting added to ad group {ad_group_id}"
             }
             
@@ -181,7 +203,12 @@ class AudienceTools:
         customer_id: str,
         audience_type: Optional[str] = None
     ) -> Dict[str, Any]:
-        """List all available audiences/user lists."""
+        """List all available audiences/user lists.
+        
+        Args:
+            customer_id: The customer ID
+            audience_type: Optional filter by audience type (USER_LIST, USER_INTEREST, etc.)
+        """
         try:
             client = self.auth_manager.get_client(customer_id)
             googleads_service = client.get_service("GoogleAdsService")
@@ -348,4 +375,5 @@ class AudienceTools:
         except GoogleAdsException as e:
             logger.error(f"Failed to get audience performance: {e}")
             raise
+
 

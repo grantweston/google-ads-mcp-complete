@@ -43,7 +43,7 @@ class BiddingTools:
             operations = []
             applied_adjustments = []
             
-            # Device bid adjustments
+            # Device bid adjustments - use simpler approach
             if "device" in adjustments:
                 device_adjustments = adjustments["device"]
                 
@@ -57,13 +57,15 @@ class BiddingTools:
                         customer_id, campaign_id
                     )
                     
-                    # Set device criterion
+                    # Set device criterion using correct API v21 structure
                     if device_type.lower() == "mobile":
-                        criterion.mobile_device.device_type = client.enums.MobileDeviceTypeEnum.MOBILE
+                        criterion.device.type = client.enums.DeviceEnum.MOBILE
                     elif device_type.lower() == "desktop":  
-                        criterion.platform.platform_name = "Desktop"
+                        criterion.device.type = client.enums.DeviceEnum.DESKTOP
                     elif device_type.lower() == "tablet":
-                        criterion.mobile_device.device_type = client.enums.MobileDeviceTypeEnum.TABLET
+                        criterion.device.type = client.enums.DeviceEnum.TABLET
+                    else:
+                        continue
                     
                     # Set bid modifier
                     criterion.bid_modifier = modifier
@@ -152,7 +154,6 @@ class BiddingTools:
                     campaign_criterion.type,
                     campaign_criterion.bid_modifier,
                     campaign_criterion.status,
-                    campaign_criterion.mobile_device.device_type,
                     campaign_criterion.location.geo_target_constant,
                     geo_target_constant.name,
                     metrics.clicks,
@@ -190,8 +191,10 @@ class BiddingTools:
                 target_name = "Unknown"
                 
                 if adjustment_type == "MOBILE_DEVICE":
-                    device_type = str(row.campaign_criterion.mobile_device.device_type.name)
-                    target_name = device_type.title()
+                    # For mobile devices, we can't differentiate between mobile/tablet without device_type field
+                    target_name = "Mobile Device"
+                elif adjustment_type == "PLATFORM":
+                    target_name = "Desktop"
                 elif adjustment_type == "LOCATION":
                     target_name = str(row.geo_target_constant.name) if hasattr(row, 'geo_target_constant') else "Location"
                 
@@ -247,9 +250,25 @@ class BiddingTools:
         name: str,
         strategy_type: str,
         target_cpa_micros: Optional[int] = None,
-        target_roas: Optional[float] = None
+        target_roas: Optional[float] = None,
+        strategy_config: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Create a portfolio bidding strategy for sharing across campaigns."""
+        """Create a portfolio bidding strategy for sharing across campaigns.
+        
+        Args:
+            customer_id: The customer ID
+            name: Name for the bidding strategy
+            strategy_type: Strategy type (TARGET_CPA, TARGET_ROAS, MAXIMIZE_CONVERSIONS, MAXIMIZE_CLICKS, TARGET_IMPRESSION_SHARE)
+            target_cpa_micros: Target CPA in micros (for TARGET_CPA)
+            target_roas: Target ROAS as decimal (for TARGET_ROAS)
+            strategy_config: Additional configuration for complex strategies like TARGET_IMPRESSION_SHARE.
+                For TARGET_IMPRESSION_SHARE, provide:
+                {
+                    "location": "TOP_OF_PAGE" | "ABSOLUTE_TOP_OF_PAGE" | "ANYWHERE_ON_PAGE",
+                    "impression_share_target": 0.65,  # 65% impression share as decimal (converted to micros internally)
+                    "max_cpc_bid_limit_micros": 5000000  # Optional: $5.00 max CPC in micros
+                }
+        """
         try:
             client = self.auth_manager.get_client(customer_id)
             bidding_strategy_service = client.get_service("BiddingStrategyService")
@@ -277,6 +296,42 @@ class BiddingTools:
             elif strategy_type.upper() == "MAXIMIZE_CLICKS":
                 bidding_strategy.maximize_clicks = client.get_type("MaximizeClicks")
                 bidding_strategy.type_ = client.enums.BiddingStrategyTypeEnum.MAXIMIZE_CLICKS
+                
+            elif strategy_type.upper() == "TARGET_IMPRESSION_SHARE":
+                # Handle TARGET_IMPRESSION_SHARE with required parameters
+                if not strategy_config:
+                    raise ValueError("TARGET_IMPRESSION_SHARE requires strategy_config with location, impression_share_target, and optionally max_cpc_bid_limit")
+                
+                target_impression_share = client.get_type("TargetImpressionShare")
+                
+                # Required: location_fraction_micros (percentage as micros, e.g. 650000 for 65%)
+                impression_share_target = strategy_config.get("impression_share_target")
+                if impression_share_target is None:
+                    raise ValueError("TARGET_IMPRESSION_SHARE requires impression_share_target (decimal percentage, e.g. 0.65 for 65%)")
+                # Convert decimal percentage to micros (0.65 -> 650000)
+                target_impression_share.location_fraction_micros = int(impression_share_target * 1_000_000)
+                
+                # Required: location (TOP_OF_PAGE, ABSOLUTE_TOP_OF_PAGE, etc.)
+                location = strategy_config.get("location", "TOP_OF_PAGE").upper()
+                if location == "TOP_OF_PAGE":
+                    target_impression_share.location = client.enums.TargetImpressionShareLocationEnum.TOP_OF_PAGE
+                elif location == "ABSOLUTE_TOP_OF_PAGE":
+                    target_impression_share.location = client.enums.TargetImpressionShareLocationEnum.ABSOLUTE_TOP_OF_PAGE
+                elif location == "ANYWHERE_ON_PAGE":
+                    target_impression_share.location = client.enums.TargetImpressionShareLocationEnum.ANYWHERE_ON_PAGE
+                else:
+                    raise ValueError(f"Invalid location: {location}. Must be TOP_OF_PAGE, ABSOLUTE_TOP_OF_PAGE, or ANYWHERE_ON_PAGE")
+                
+                # Optional: max_cpc_bid_limit in micros
+                max_cpc_limit_micros = strategy_config.get("max_cpc_bid_limit_micros")
+                if max_cpc_limit_micros:
+                    target_impression_share.cpc_bid_ceiling_micros = max_cpc_limit_micros
+                
+                bidding_strategy.target_impression_share = target_impression_share
+                bidding_strategy.type_ = client.enums.BiddingStrategyTypeEnum.TARGET_IMPRESSION_SHARE
+                
+            else:
+                raise ValueError(f"Unsupported strategy type: {strategy_type}. Supported types: TARGET_CPA, TARGET_ROAS, MAXIMIZE_CONVERSIONS, MAXIMIZE_CLICKS, TARGET_IMPRESSION_SHARE")
             
             # Execute operation
             response = bidding_strategy_service.mutate_bidding_strategies(
@@ -286,16 +341,29 @@ class BiddingTools:
             
             strategy_id = response.results[0].resource_name.split('/')[-1]
             
-            return {
+            result = {
                 "success": True,
                 "strategy_id": strategy_id,
                 "strategy_name": name,
                 "strategy_type": strategy_type,
-                "target_cpa": micros_to_currency(target_cpa_micros) if target_cpa_micros else None,
-                "target_roas": target_roas,
                 "resource_name": response.results[0].resource_name,
                 "message": f"Portfolio bidding strategy '{name}' created successfully"
             }
+            
+            # Add strategy-specific configuration to response
+            if strategy_type.upper() == "TARGET_CPA":
+                result["target_cpa"] = micros_to_currency(target_cpa_micros) if target_cpa_micros else None
+            elif strategy_type.upper() == "TARGET_ROAS":
+                result["target_roas"] = target_roas
+            elif strategy_type.upper() == "TARGET_IMPRESSION_SHARE":
+                if strategy_config:
+                    result["impression_share_config"] = {
+                        "location": strategy_config.get("location", "TOP_OF_PAGE"),
+                        "impression_share_target": f"{strategy_config.get('impression_share_target', 0) * 100:.1f}%",
+                        "max_cpc_bid_limit": micros_to_currency(strategy_config.get("max_cpc_bid_limit_micros")) if strategy_config.get("max_cpc_bid_limit_micros") else None
+                    }
+            
+            return result
             
         except GoogleAdsException as e:
             logger.error(f"Failed to create portfolio bidding strategy: {e}")
@@ -545,4 +613,5 @@ class BiddingTools:
                 recommendations.append(f"📱 Mobile conversion rate low ({mobile_device['performance']['conversion_rate']}) - check mobile landing page experience")
         
         return recommendations
+
 

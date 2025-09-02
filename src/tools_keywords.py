@@ -125,7 +125,17 @@ class KeywordTools:
         campaign_id: Optional[str] = None,
         ad_group_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Add negative keywords at campaign or ad group level."""
+        """Add negative keywords at campaign or ad group level.
+        
+        IMPORTANT SYNTAX:
+        - keywords: Array of strings like ['free', 'cheap', 'demo']
+        - Use EITHER campaign_id OR ad_group_id, not both
+        - Tool creates proper KeywordInfo protobuf objects automatically
+        
+        Example usage:
+        - Campaign level: add_negative_keywords(customer_id='123', keywords=['free', 'cheap'], campaign_id='456')
+        - Ad group level: add_negative_keywords(customer_id='123', keywords=['trial'], ad_group_id='789')
+        """
         try:
             client = self.auth_manager.get_client(customer_id)
             
@@ -142,8 +152,12 @@ class KeywordTools:
                         customer_id, campaign_id
                     )
                     criterion.negative = True
-                    criterion.keyword.text = keyword_text
-                    criterion.keyword.match_type = client.enums.KeywordMatchTypeEnum.BROAD
+                    
+                    # Create KeywordInfo object properly
+                    keyword_info = client.get_type("KeywordInfo")
+                    keyword_info.text = keyword_text
+                    keyword_info.match_type = client.enums.KeywordMatchTypeEnum.BROAD
+                    criterion.keyword = keyword_info
                     
                     operations.append(operation)
                 
@@ -168,8 +182,12 @@ class KeywordTools:
                         customer_id, ad_group_id
                     )
                     criterion.negative = True
-                    criterion.keyword.text = keyword_text
-                    criterion.keyword.match_type = client.enums.KeywordMatchTypeEnum.BROAD
+                    
+                    # Create KeywordInfo object properly
+                    keyword_info = client.get_type("KeywordInfo")
+                    keyword_info.text = keyword_text
+                    keyword_info.match_type = client.enums.KeywordMatchTypeEnum.BROAD
+                    criterion.keyword = keyword_info
                     
                     operations.append(operation)
                 
@@ -689,9 +707,7 @@ class KeywordTools:
                     ad_group.name,
                     ad_group.id,
                     campaign.name,
-                    campaign.id,
-                    ad_group_criterion.keyword.text,
-                    ad_group_criterion.keyword.match_type
+                    campaign.id
                 FROM search_term_view
                 WHERE segments.date DURING {date_range}
                 AND metrics.impressions >= {min_impressions}
@@ -740,8 +756,8 @@ class KeywordTools:
                     "ctr": f"{row.metrics.ctr:.2%}" if row.metrics.ctr else "0.00%",
                     "avg_cpc": row.metrics.average_cpc / 1_000_000 if row.metrics.average_cpc else 0,
                     "roas": round(conversion_value / cost, 2) if cost > 0 else 0,
-                    "triggered_keyword": str(row.ad_group_criterion.keyword.text) if hasattr(row, 'ad_group_criterion') else "N/A",
-                    "match_type": str(row.ad_group_criterion.keyword.match_type.name) if hasattr(row, 'ad_group_criterion') else "N/A",
+                    "triggered_keyword": "N/A",  # Not available from search_term_view
+                    "match_type": "N/A",  # Not available from search_term_view
                     "campaign_name": str(row.campaign.name),
                     "ad_group_name": str(row.ad_group.name),
                 }

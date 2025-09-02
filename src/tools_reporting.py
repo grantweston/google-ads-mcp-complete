@@ -142,7 +142,7 @@ class ReportingTools:
                     metrics.conversions,
                     metrics.ctr,
                     metrics.average_cpc,
-                    metrics.conversion_rate,
+                    metrics.conversions,
                     metrics.cost_per_conversion
                 FROM ad_group
                 WHERE segments.date DURING {date_range}
@@ -175,7 +175,7 @@ class ReportingTools:
                         "conversions": row.metrics.conversions,
                         "ctr": f"{row.metrics.ctr:.2%}",
                         "average_cpc": micros_to_currency(row.metrics.average_cpc),
-                        "conversion_rate": f"{row.metrics.conversion_rate:.2%}",
+                        "conversion_rate": f"{(row.metrics.conversions / row.metrics.clicks * 100):.2f}%" if row.metrics.clicks > 0 else "0.00%",
                         "cost_per_conversion": micros_to_currency(row.metrics.cost_per_conversion),
                     },
                 })
@@ -220,7 +220,7 @@ class ReportingTools:
                     metrics.conversions,
                     metrics.ctr,
                     metrics.average_cpc,
-                    metrics.conversion_rate,
+                    metrics.conversions,
                     metrics.average_position
                 FROM keyword_view
                 WHERE segments.date DURING {date_range}
@@ -258,7 +258,7 @@ class ReportingTools:
                         "conversions": row.metrics.conversions,
                         "ctr": f"{row.metrics.ctr:.2%}",
                         "average_cpc": micros_to_currency(row.metrics.average_cpc),
-                        "conversion_rate": f"{row.metrics.conversion_rate:.2%}",
+                        "conversion_rate": f"{(row.metrics.conversions / row.metrics.clicks * 100):.2f}%" if row.metrics.clicks > 0 else "0.00%",
                         "average_position": f"{row.metrics.average_position:.1f}" if row.metrics.average_position else "N/A",
                     },
                 })
